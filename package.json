@@ -2,10 +2,12 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "prisma generate",
+    "build": "prisma migrate deploy"
   },
   "keywords": [],
   "author": "",
@@ -35,9 +37,4 @@
     "@types/node": "^25.6.0",
     "nodemon": "^3.1.14"
   }
-  "scripts": {
-  "start": "node server.js",
-  "postinstall": "prisma generate",
-  "build": "prisma migrate deploy"
-}
 }
