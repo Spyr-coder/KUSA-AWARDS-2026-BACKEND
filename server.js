@@ -31,12 +31,32 @@ app.use(
 /* =========================
    CORS (LOCK THIS IN PRODUCTION)
 ========================= */
-app.use(
-  cors({
-    origin: "https://awardskusa.netlify.app/",
-    credentials: true,
-  })
-);
+/* =========================
+   CORS (PRODUCTION SAFE FIX)
+========================= */
+
+const allowedOrigins = [
+  "https://awardskusa.netlify.app",
+  "http://localhost:5500",
+  "http://127.0.0.1:5500"
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow mobile apps or curl (no origin)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true
+}));
+
+// 🔥 HANDLE PRE-FLIGHT REQUESTS
+app.options("*", cors());
 
 /* =========================
    BODY PARSING
