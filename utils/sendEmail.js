@@ -15,4 +15,11 @@ exports.sendOTP = async (email, code) => {
     subject: "KUSA Awards OTP",
     text: `Your verification code is: ${code}`,
   });
+  transporter.verify((error, success) => {
+  if (error) {
+    console.error("EMAIL CONFIG ERROR:", error);
+  } else {
+    console.log("EMAIL SERVER READY");
+  }
+});
 };
