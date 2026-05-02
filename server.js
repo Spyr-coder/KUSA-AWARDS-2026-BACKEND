@@ -18,7 +18,6 @@ const adminAuthRoutes = require("./routes/adminAuth");
 const app = express();
 const path = require("path");
 
-
 /* =========================
    SECURITY HEADERS
 ========================= */
@@ -29,10 +28,7 @@ app.use(
 );
 
 /* =========================
-   CORS (LOCK THIS IN PRODUCTION)
-========================= */
-/* =========================
-   CORS (PRODUCTION SAFE FIX)
+   CORS (BULLETPROOF FIX)
 ========================= */
 
 const allowedOrigins = [
@@ -43,19 +39,20 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // allow mobile apps or curl (no origin)
+    // allow tools like Postman / server-to-server calls
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    return callback(new Error("Not allowed by CORS"));
+    // IMPORTANT: DO NOT crash server
+    return callback(null, false);
   },
   credentials: true
 }));
 
-// 🔥 HANDLE PRE-FLIGHT REQUESTS
+// Preflight support (CRITICAL)
 app.options("*", cors());
 
 /* =========================
@@ -66,35 +63,29 @@ app.use(express.urlencoded({ extended: true }));
 
 /* =========================
    GLOBAL RATE LIMITER
-   (protect whole API)
 ========================= */
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
-  message: {
-    error: "Too many requests. Try again later.",
-  },
+  message: { error: "Too many requests. Try again later." },
 });
 
 app.use("/api", apiLimiter);
 
 /* =========================
-   STRICT VOTE LIMITER
-   (extra protection layer)
+   VOTE LIMITER
 ========================= */
 const voteLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 60 * 1000,
   max: 5,
-  message: {
-    error: "You are voting too fast. Slow down.",
-  },
+  message: { error: "You are voting too fast. Slow down." },
 });
 
 /* =========================
    ROUTES
 ========================= */
 app.use("/api/auth", authRoutes);
-app.use("/api/vote", voteLimiter, voteRoutes); // 🔥 extra protection
+app.use("/api/vote", voteLimiter, voteRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/nominees", nomineeRoutes);
 app.use("/api/settings", settingsRoutes);
@@ -103,6 +94,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/nominations", nominationRoutes);
 app.use("/api/admin/analytics", adminAnalyticsRoutes);
 app.use("/api/admin-auth", adminAuthRoutes);
+
 /* =========================
    HEALTH CHECK
 ========================= */
@@ -111,14 +103,11 @@ app.get("/", (req, res) => {
 });
 
 /* =========================
-   ERROR HANDLER
+   GLOBAL ERROR HANDLER
 ========================= */
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-
-  res.status(500).json({
-    error: "Internal server error",
-  });
+  console.error("SERVER ERROR:", err.message);
+  res.status(500).json({ error: "Internal server error" });
 });
 
 /* =========================
