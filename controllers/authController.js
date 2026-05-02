@@ -17,14 +17,23 @@ exports.sendOtp = async (req, res) => {
     /* =========================
        STRICT DOMAIN CHECK
     ========================= */
-    if (
-      email !== "kusaawards2026@gmail.com" &&
-      !email.endsWith("@students.ku.ac.ke")
-    ) {
-      return res.status(403).json({
-        error: "Only KU student emails allowed",
-      });
-    }
+   const normalizedEmail = email.trim().toLowerCase();
+
+// KU allowed domain
+const ALLOWED_DOMAIN = "@students.ku.ac.ke";
+
+// admin override email
+const ADMIN_EMAIL = "kusaawards2026@gmail.com";
+
+const isAllowed =
+  normalizedEmail === ADMIN_EMAIL ||
+  normalizedEmail.endsWith(ALLOWED_DOMAIN);
+
+if (!isAllowed) {
+  return res.status(403).json({
+    error: "Only KU student emails allowed",
+  });
+}
 
     /* =========================
        RATE LIMIT PROTECTION
