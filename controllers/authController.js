@@ -4,6 +4,12 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 
 /* =========================
+   CONSTANTS
+========================= */
+const ADMIN_EMAIL = "kusaawards2026@gmail.com";
+const ALLOWED_DOMAIN = "@students.ku.ac.ke";
+
+/* =========================
    SEND OTP
 ========================= */
 exports.sendOtp = async (req, res) => {
@@ -14,33 +20,28 @@ exports.sendOtp = async (req, res) => {
       return res.status(400).json({ error: "Email required" });
     }
 
+    // ✅ NORMALIZE EMAIL (CRITICAL)
+    const normalizedEmail = email.trim().toLowerCase();
+
     /* =========================
-       STRICT DOMAIN CHECK
+       DOMAIN CHECK
     ========================= */
-   const normalizedEmail = email.trim().toLowerCase();
+    const isAllowed =
+      normalizedEmail === ADMIN_EMAIL ||
+      normalizedEmail.endsWith(ALLOWED_DOMAIN);
 
-// KU allowed domain
-const ALLOWED_DOMAIN = "@students.ku.ac.ke";
-
-// admin override email
-const ADMIN_EMAIL = "kusaawards2026@gmail.com";
-
-const isAllowed =
-  normalizedEmail === ADMIN_EMAIL ||
-  normalizedEmail.endsWith(ALLOWED_DOMAIN);
-
-if (!isAllowed) {
-  return res.status(403).json({
-    error: "Only KU student emails allowed",
-  });
-}
+    if (!isAllowed) {
+      return res.status(403).json({
+        error: "Only KU student emails allowed",
+      });
+    }
 
     /* =========================
-       RATE LIMIT PROTECTION
+       RATE LIMIT (ANTI-SPAM)
     ========================= */
     const recentOtp = await prisma.oTP.findFirst({
       where: {
-        email,
+        email: normalizedEmail, // ✅ FIXED
         createdAt: {
           gte: new Date(Date.now() - 60 * 1000),
         },
@@ -68,19 +69,24 @@ if (!isAllowed) {
     ========================= */
     await prisma.oTP.create({
       data: {
-        email,
+        email: normalizedEmail, // ✅ FIXED
         code: hashedCode,
         expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       },
     });
 
-    await sendOTP(email, code);
+    /* =========================
+       SEND EMAIL
+    ========================= */
+    await sendOTP(normalizedEmail, code); // ✅ FIXED
 
     return res.json({
       message: "OTP sent successfully",
     });
+
   } catch (err) {
     console.error("OTP SEND ERROR:", err);
+
     return res.status(500).json({
       error: "Failed to send OTP",
     });
@@ -100,14 +106,20 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
+    // ✅ NORMALIZE EMAIL AGAIN (CRITICAL)
+    const normalizedEmail = email.trim().toLowerCase();
+
     const hashedCode = crypto
       .createHash("sha256")
       .update(code)
       .digest("hex");
 
+    /* =========================
+       FIND VALID OTP
+    ========================= */
     const otp = await prisma.oTP.findFirst({
       where: {
-        email,
+        email: normalizedEmail, // ✅ FIXED
         code: hashedCode,
         expiresAt: {
           gte: new Date(),
@@ -121,29 +133,38 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
+    /* =========================
+       DELETE USED OTPs
+    ========================= */
     await prisma.oTP.deleteMany({
-      where: { email },
+      where: { email: normalizedEmail }, // ✅ FIXED
     });
 
+    /* =========================
+       FIND OR CREATE USER
+    ========================= */
     let user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail }, // ✅ FIXED
     });
 
     if (!user) {
       user = await prisma.user.create({
         data: {
-          email,
-          name: email.split("@")[0],
+          email: normalizedEmail, // ✅ FIXED
+          name: normalizedEmail.split("@")[0],
           provider: "otp",
-          googleId: email,
+          googleId: normalizedEmail,
           role:
-            email === "kusaawards2026@gmail.com"
+            normalizedEmail === ADMIN_EMAIL
               ? "ADMIN"
               : "USER",
         },
       });
     }
 
+    /* =========================
+       GENERATE JWT
+    ========================= */
     const token = jwt.sign(
       {
         id: user.id,
@@ -162,6 +183,7 @@ exports.verifyOtp = async (req, res) => {
         role: user.role,
       },
     });
+
   } catch (err) {
     console.error("OTP VERIFY ERROR:", err);
 
