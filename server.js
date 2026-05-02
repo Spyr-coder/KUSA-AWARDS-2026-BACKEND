@@ -53,7 +53,7 @@ app.use(cors({
 }));
 
 // Preflight support (CRITICAL)
-app.options("*", cors());
+app.options("/*", cors());
 
 /* =========================
    BODY PARSING
