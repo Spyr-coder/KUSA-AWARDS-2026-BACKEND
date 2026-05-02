@@ -33,7 +33,7 @@ app.use(
 ========================= */
 app.use(
   cors({
-    origin: "*", // later replace with your frontend domain
+    origin: "https://awardskusa.netlify.app/",
     credentials: true,
   })
 );
