@@ -1,8 +1,10 @@
 require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const path = require("path");
 
 const authRoutes = require("./routes/auth");
 const voteRoutes = require("./routes/vote");
@@ -16,7 +18,6 @@ const adminAnalyticsRoutes = require("./routes/adminAnalytics");
 const adminAuthRoutes = require("./routes/adminAuth");
 
 const app = express();
-const path = require("path");
 
 /* =========================
    SECURITY HEADERS
@@ -28,32 +29,50 @@ app.use(
 );
 
 /* =========================
-   CORS (BULLETPROOF FIX)
+   CORS CONFIG
 ========================= */
 
 const allowedOrigins = [
   "https://awardskusa.netlify.app",
   "http://localhost:5500",
-  "http://127.0.0.1:5500"
+  "http://127.0.0.1:5500",
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
-    // allow tools like Postman / server-to-server calls
-    if (!origin) return callback(null, true);
+    // Allow Postman/server-to-server requests
+    if (!origin) {
+      return callback(null, true);
+    }
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    // IMPORTANT: DO NOT crash server
+    console.log("Blocked CORS Origin:", origin);
+
+    // Do NOT crash the server
     return callback(null, false);
   },
-  credentials: true
-}));
 
-// Preflight support (CRITICAL)
-app.options("/*", cors());
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+
+/* =========================
+   PREFLIGHT FIX
+========================= */
+/*
+  IMPORTANT:
+  Express/path-to-regexp in newer versions
+  crashes on "*" and "/*"
+
+  Use REGEX instead
+*/
+app.options(/.*/, cors(corsOptions));
 
 /* =========================
    BODY PARSING
@@ -67,7 +86,9 @@ app.use(express.urlencoded({ extended: true }));
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
-  message: { error: "Too many requests. Try again later." },
+  message: {
+    error: "Too many requests. Try again later.",
+  },
 });
 
 app.use("/api", apiLimiter);
@@ -78,7 +99,9 @@ app.use("/api", apiLimiter);
 const voteLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
-  message: { error: "You are voting too fast. Slow down." },
+  message: {
+    error: "You are voting too fast. Slow down.",
+  },
 });
 
 /* =========================
@@ -103,11 +126,23 @@ app.get("/", (req, res) => {
 });
 
 /* =========================
+   404 HANDLER
+========================= */
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Route not found",
+  });
+});
+
+/* =========================
    GLOBAL ERROR HANDLER
 ========================= */
 app.use((err, req, res, next) => {
-  console.error("SERVER ERROR:", err.message);
-  res.status(500).json({ error: "Internal server error" });
+  console.error("SERVER ERROR:", err);
+
+  res.status(500).json({
+    error: "Internal server error",
+  });
 });
 
 /* =========================
