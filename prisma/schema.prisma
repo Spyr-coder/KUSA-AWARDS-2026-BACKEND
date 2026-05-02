@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  name        String
+  image       String?
+  provider    String
+  googleId    String       @unique
+  role        Role         @default(USER)
+  createdAt   DateTime     @default(now())
+  nominations Nomination[] @relation("UserNominations")
+  votes       Vote[]       @relation("UserVotes")
+
+  @@index([email])
+  @@index([role])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  winnerId    String?
+  nominees    Nominee[]
+  votes       Vote[]
+
+  @@index([isActive])
+}
+
+model Nominee {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  image       String?
+  categoryId  String
+  approved    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  contact     String?
+  nominations Nomination[]
+  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  votes       Vote[]
+
+  @@index([categoryId])
+  @@index([approved])
+}
+
+model Nomination {
+  id        String   @id @default(cuid())
+  userId    String
+  nomineeId String
+  reason    String?
+  createdAt DateTime @default(now())
+  nominee   Nominee  @relation(fields: [nomineeId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserNominations", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([nomineeId])
+}
+
+model Vote {
+  id         String   @id @default(cuid())
+  userId     String
+  categoryId String
+  nomineeId  String
+  ipAddress  String
+  deviceHash String
+  createdAt  DateTime @default(now())
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  nominee    Nominee  @relation(fields: [nomineeId], references: [id], onDelete: Cascade)
+  user       User     @relation("UserVotes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId])
+  @@index([categoryId])
+  @@index([nomineeId])
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  userId    String?
+  details   String?
+  ipAddress String?
+  device    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+}
+
+model Setting {
+  id              String   @id @default(cuid())
+  nominationsOpen Boolean  @default(false)
+  votingOpen      Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model OTP {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+}
+
+enum Role {
+  USER
+  ADMIN
+}
